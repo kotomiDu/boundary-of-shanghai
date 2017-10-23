@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.2.0/dist/leaflet.css"
+          integrity="sha512-M2wvCLH6DSRazYeZRIm1JnYyh22purTM+FDB5CsyxtQJYeKq83arPe5wgbNmcFXGqiSH2XR8dT/fJISVA1r/zQ=="
+          crossorigin=""/>
+    <style>
+
+        #map {
+            width: 960px;
+            height: 500px;
+        }
+
+        svg {
+            position: relative;
+        }
+
+        path {
+            fill: #000;
+            fill-opacity: .2;
+            stroke: #fff;
+            stroke-width: 1.5px;
+        }
+
+        path:hover {
+            fill: brown;
+            fill-opacity: .7;
+        }
+    </style>
+</head>
+<body>
+<div id = "map" ></div>
+<script src="../js/d3_v3/d3.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.5/leaflet.js"></script>
+<script>
+
+    var map = new L.Map("map", {center: [31.289, 121.4648], zoom: 9}) //[31.289, 121.4648] [37.8, -96.9] 4
+        .addLayer(new L.TileLayer("http://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"));
+
+    var svg = d3.select(map.getPanes().overlayPane).append("svg"),
+        g = svg.append("g").attr("class", "leaflet-zoom-hide");
+
+
+    d3.json("../data/map/shanghai.json", function(error, collection) {
+        if (error) throw error;
+
+        var transform = d3.geo.transform({point: projectPoint}),
+            path = d3.geo.path().projection(transform);
+
+        var feature = g.selectAll("path")
+            .data(collection.features)
+            .enter().append("path");
+
+        map.on("viewreset", reset);
+        reset();
+
+        // Reposition the SVG to cover the features.
+        function reset() {
+            var bounds = path.bounds(collection),
+                topLeft = bounds[0],
+                bottomRight = bounds[1];
+
+            svg .attr("width", bottomRight[0] - topLeft[0])
+                .attr("height", bottomRight[1] - topLeft[1])
+                .style("left", topLeft[0] + "px")
+                .style("top", topLeft[1] + "px");
+
+            g   .attr("transform", "translate(" + -topLeft[0] + "," + -topLeft[1] + ")");
+
+            feature.attr("d", path);
+            feature.append("svg:title")
+                .text(function (d) {
+                    return d.name;
+                })
+        }
+
+
+    });
+
+    // Use Leaflet to implement a D3 geometric transformation.
+    function projectPoint(x, y) {
+        var point = map.latLngToLayerPoint(new L.LatLng(y, x));
+//        console.log("point", point.x, point.y)
+        this.stream.point(point.x, point.y);
+    }
+
+
+    d3.json("../data/circle.json", function(error,collection) {
+        if(error) console.log(error);
+
+        var svgC = d3.select("#map").select("svg"),
+            cg = svgC.select(".leaflet-zoom-hide");
+
+        // Add a LatLng object to each item in the dataset
+        collection.objects.forEach(function (d) {
+            d.LatLng = new L.LatLng(d.circle.coordinates[0],
+                d.circle.coordinates[1])
+        })
+
+        var feature = cg.selectAll("circle")
+            .data(collection.objects)
+            .enter().append("circle")
+            .style("stroke", "black")
+            .style("opacity", .6)
+            .style("fill", "red")
+
+        var initZoom = map.getZoom();
+
+        var initRadius = 9;
+
+        map.on("viewreset",update);
+
+        update();
+
+        function update(){
+            var curZoom = map.getZoom();
+
+            var curRadius = curZoom * initRadius / initZoom ;
+
+            feature.attr("transform",
+                function(d) {
+                    return "translate("+
+                        map.latLngToLayerPoint(d.LatLng).x +","+
+                        map.latLngToLayerPoint(d.LatLng).y +")";
+                }
+            )
+                .attr("r",curRadius);
+        }
+    })
+
+
+</script>
+</body>
+</html>
